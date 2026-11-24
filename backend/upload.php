@@ -1,173 +1,191 @@
 <?php
 
 error_reporting(E_ALL);
-ini_set('display_errors', 1);
+ini_set('display_errors', 0);
 
 header('Content-Type: application/json');
 
-// Connect to database
 require_once(__DIR__ . "/db.php");
+
+// Function to return JSON response
+function sendResponse($data) {
+    echo json_encode($data);
+    exit();
+}
 
 // Check database connection
 if (!$conn) {
-    die(json_encode([
+    sendResponse([
         "status" => "error",
-        "message" => "DB connection failed: " . mysqli_connect_error()
-    ]));
+        "message" => "Database connection failed"
+    ]);
 }
 
-if (isset($_FILES['image'])) {
-
-    $filename = basename(strtolower($_FILES['image']['name']));
-    $tempname = $_FILES['image']['tmp_name'];
-    $fileType = $_FILES['image']['type'];
-    $fileSize = $_FILES['image']['size'];
-
-    // Allowed image types
-    $allowedTypes = ['image/jpeg', 'image/png', 'image/jpg'];
-
-    if (!in_array($fileType, $allowedTypes)) {
-        echo json_encode([
-            "status" => "error",
-            "message" => "Only JPG/PNG allowed"
-        ]);
-        exit();
-    }
-
-    // File size validation (5 MB)
-    if ($fileSize > 5 * 1024 * 1024) {
-        echo json_encode([
-            "status" => "error",
-            "message" => "File too large"
-        ]);
-        exit();
-    }
-
-    // Validate image
-    if (getimagesize($tempname) === false) {
-        echo json_encode([
-            "status" => "error",
-            "message" => "Invalid image"
-        ]);
-        exit();
-    }
-
-    // Generate unique filename
-    $newName = time() . "_" . preg_replace(
-        "/[^a-zA-Z0-9._-]/",
-        "_",
-        $filename
-    );
-
-    $target_file = __DIR__ . "/../uploads/" . $newName;
-
-    // Upload image
-    if (!move_uploaded_file($tempname, $target_file)) {
-        echo json_encode([
-            "status" => "error",
-            "message" => "Upload failed"
-        ]);
-        exit();
-    }
-
-    // Locate Python prediction script
-    $script = realpath(__DIR__ . "/../ai_model/predict.py");
-
-    if (!$script) {
-        unlink($target_file);
-
-        echo json_encode([
-            "status" => "error",
-            "message" => "Python script not found"
-        ]);
-        exit();
-    }
-
-    // Execute Python AI model
-    $command = "python " . escapeshellarg($script) . " " .
-               escapeshellarg($target_file) . " 2>&1";
-
-    $output = shell_exec($command);
-
-    if (!$output) {
-        unlink($target_file);
-
-        echo json_encode([
-            "status" => "error",
-            "message" => "AI model failed"
-        ]);
-        exit();
-    }
-
-    $output = trim($output);
-    $lines = array_values(array_filter(explode("\n", $output)));
-
-    $disease = trim($lines[0] ?? "UNKNOWN");
-    $confidence = trim($lines[1] ?? "0");
-
-    // Reject non-oral images
-    if (strtoupper($disease) == "NON_ORAL") {
-        unlink($target_file);
-
-        echo json_encode([
-            "status" => "error",
-            "message" => "Non-oral image detected"
-        ]);
-        exit();
-    }
-
-    // Reject unknown results
-    if (strtoupper($disease) == "UNKNOWN") {
-        unlink($target_file);
-
-        echo json_encode([
-            "status" => "error",
-            "message" => "Unknown result"
-        ]);
-        exit();
-    }
-
-    // Insert prediction into database
-    $sql = "INSERT INTO predictions (image, result, percentage, created_at)
-            VALUES (?, ?, ?, NOW())";
-
-    $stmt = $conn->prepare($sql);
-
-    if (!$stmt) {
-        echo json_encode([
-            "status" => "error",
-            "message" => "Prepare failed: " . $conn->error
-        ]);
-        exit();
-    }
-
-    // All three values are strings
-    $stmt->bind_param("sss", $newName, $disease, $confidence);
-
-    if (!$stmt->execute()) {
-        echo json_encode([
-            "status" => "error",
-            "message" => "Insert failed: " . $stmt->error
-        ]);
-        exit();
-    }
-
-    // Successful response
-    echo json_encode([
-        "status" => "success",
-        "disease" => $disease,
-        "confidence" => $confidence,
-        "image" => $newName
-    ]);
-
-    $stmt->close();
-
-} else {
-
-    echo json_encode([
+// Check image upload
+if (!isset($_FILES['image'])) {
+    sendResponse([
         "status" => "error",
         "message" => "No image selected"
     ]);
 }
+
+if ($_FILES['image']['error'] !== UPLOAD_ERR_OK) {
+    sendResponse([
+        "status" => "error",
+        "message" => "Image upload error: " . $_FILES['image']['error']
+    ]);
+}
+
+// Get uploaded image details
+$filename = basename($_FILES['image']['name']);
+$tempname = $_FILES['image']['tmp_name'];
+$fileSize = $_FILES['image']['size'];
+
+// Validate image type
+$allowedTypes = ['image/jpeg', 'image/png'];
+
+$fileInfo = finfo_open(FILEINFO_MIME_TYPE);
+$fileType = finfo_file($fileInfo, $tempname);
+finfo_close($fileInfo);
+
+if (!in_array($fileType, $allowedTypes)) {
+    sendResponse([
+        "status" => "error",
+        "message" => "Only JPG and PNG images are allowed"
+    ]);
+}
+
+// Validate image size (5 MB)
+if ($fileSize > 5 * 1024 * 1024) {
+    sendResponse([
+        "status" => "error",
+        "message" => "Image size must be below 5 MB"
+    ]);
+}
+
+// Validate actual image
+if (getimagesize($tempname) === false) {
+    sendResponse([
+        "status" => "error",
+        "message" => "Invalid image file"
+    ]);
+}
+
+// Generate unique filename
+$newName = time() . "_" . preg_replace(
+    "/[^a-zA-Z0-9._-]/",
+    "_",
+    $filename
+);
+
+// Upload directory
+$uploadDir = __DIR__ . "/../uploads/";
+
+if (!is_dir($uploadDir)) {
+    mkdir($uploadDir, 0777, true);
+}
+
+$targetFile = $uploadDir . $newName;
+
+// Move uploaded image
+if (!move_uploaded_file($tempname, $targetFile)) {
+    sendResponse([
+        "status" => "error",
+        "message" => "Failed to upload image"
+    ]);
+}
+
+// Find Python prediction script
+$script = realpath(__DIR__ . "/../ai_model/predict.py");
+
+if (!$script) {
+    sendResponse([
+        "status" => "error",
+        "message" => "Python prediction script not found"
+    ]);
+}
+
+// Run Python prediction
+$command = "python " . escapeshellarg($script) . " "
+         . escapeshellarg($targetFile) . " 2>&1";
+
+$output = shell_exec($command);
+
+if ($output === null || trim($output) === "") {
+    sendResponse([
+        "status" => "error",
+        "message" => "AI model execution failed"
+    ]);
+}
+
+// Read prediction output
+$lines = array_values(
+    array_filter(
+        array_map('trim', explode("\n", trim($output))),
+        function($line) {
+            return $line !== "";
+        }
+    )
+);
+
+$disease = $lines[0] ?? "UNKNOWN";
+$confidence = $lines[1] ?? "0";
+
+// Validate prediction
+if (strtoupper($disease) === "NON_ORAL") {
+    sendResponse([
+        "status" => "error",
+        "message" => "Non-oral image detected"
+    ]);
+}
+
+if (strtoupper($disease) === "UNKNOWN") {
+    sendResponse([
+        "status" => "error",
+        "message" => "Unknown prediction result"
+    ]);
+}
+
+// Save prediction into database
+$sql = "INSERT INTO predictions
+        (image, result, percentage, created_at)
+        VALUES (?, ?, ?, NOW())";
+
+$stmt = $conn->prepare($sql);
+
+if (!$stmt) {
+    sendResponse([
+        "status" => "error",
+        "message" => "SQL prepare failed: " . $conn->error
+    ]);
+}
+
+// All three columns are strings
+$stmt->bind_param(
+    "sss",
+    $newName,
+    $disease,
+    $confidence
+);
+
+// Execute database insertion
+if (!$stmt->execute()) {
+    sendResponse([
+        "status" => "error",
+        "message" => "Database insertion failed: " . $stmt->error
+    ]);
+}
+
+// Close statement
+$stmt->close();
+
+// Success response
+sendResponse([
+    "status" => "success",
+    "message" => "Prediction saved successfully",
+    "disease" => $disease,
+    "confidence" => $confidence,
+    "image" => $newName
+]);
 
 ?>
