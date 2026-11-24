@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Upload Image</title>
+
+<style>
+
+button {
+    width: 100%;
+    padding: 12px;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: Arial;
+}
+
+body {
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+#bg-video {
+    position: fixed;
+    top: 0;
+    left: 0;
+    min-width: 100%;
+    min-height: 100%;
+    object-fit: cover;
+    z-index: -1;
+    filter: brightness(60%);
+}
+
+.container {
+    position: relative;
+    z-index: 1;
+    background: rgba(0, 0, 0, 0.6);
+    padding: 30px;
+    border-radius: 12px;
+    text-align: center;
+    color: white;
+    width: 450px;
+}
+
+h2 {
+    margin-bottom: 15px;
+    font-size: 30px;
+    color: yellow;
+    font-family: 'Times New Roman', Times, serif;
+}
+
+input {
+    width: 100%;
+    padding: 12px;
+    margin: 15px 0;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+    background: white;
+    color: black;
+    cursor: pointer;
+}
+
+button{
+    font-family: Arial, sans-serif;
+    font-weight: 900;
+    color: #000000;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+
+button:hover {
+    background: #f74e20;
+}
+
+/* HOME BUTTON */
+.home-btn{
+    background: #00ff99;
+}
+
+.home-btn:hover{
+    background: #00cc77;
+}
+
+/* RESULT BOX */
+#resultBox{
+    margin-top:15px;
+    padding:15px;
+    background: rgba(0,0,0,0.7);
+    border-radius:10px;
+    display:none;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<video autoplay muted loop id="bg-video">
+    <source src="bg1.mp4" type="video/mp4">
+</video>
+
+<div class="container">
+
+    <h2><u>UPLOAD YOUR IMAGE</u></h2>
+
+    <!-- AJAX FORM -->
+    <form id="uploadForm" enctype="multipart/form-data">
+
+        <input type="file" name="image" required>
+
+        <button type="submit">DETECT</button>
+
+    </form>
+
+    <!-- RESULT BOX -->
+    <div id="resultBox"></div>
+
+    <br>
+
+    <button class="home-btn" onclick="window.location.href='welcome.php'">
+        Home
+    </button>
+
+</div>
+
+<script>
+document.getElementById("uploadForm").addEventListener("submit", function(e){
+    e.preventDefault();
+
+    let formData = new FormData(this);
+
+    fetch("../backend/upload.php", {
+        method: "POST",
+        body: formData
+    })
+    .then(res => res.json())
+    .then(data => {
+
+        // ONLY ERROR HANDLING HERE
+        if(data.status === "error"){
+            alert(data.message); // popup error
+            return;
+        }
+
+        // SUCCESS → REDIRECT TO RESULT PAGE
+        if(data.status === "success"){
+            window.location.href =
+                "result.php?image=" + encodeURIComponent(data.image)
+                + "&disease=" + encodeURIComponent(data.disease)
+                + "&confidence=" + encodeURIComponent(data.confidence);
+        }
+
+    })
+    .catch(err => {
+        alert("Error connecting to server");
+    });
+});
+</script>
+
+</body>
+</html>

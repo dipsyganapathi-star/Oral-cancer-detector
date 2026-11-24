@@ -1,0 +1,22 @@
+{
+  "Oral_Cancer": {
+    "white_patch": 0.8,
+    "mouth_lump": 0.9,
+    "difficulty_swallowing": 0.8,
+    "jaw_pain": 0.6,
+    "red_patch": 0.5
+  },
+
+  "Gingivitis": {
+    "bleeding_gums": 0.9,
+    "swollen_gums": 0.8,
+    "bad_breath": 0.7
+  },
+
+  "Periodontitis": {
+    "loose_teeth": 0.9,
+    "bleeding_gums": 0.7,
+    "bad_breath": 0.6,
+    "jaw_pain": 0.5
+  }
+}

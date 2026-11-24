@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Contact & Feedback</title>
+
+    <style>
+
+        *{
+            margin:0;
+            padding:0;
+            box-sizing:border-box;
+            font-family:Arial;
+        }
+
+        body{
+            min-height:100vh;
+            display:flex;
+            justify-content:center;
+            align-items:center;
+            background:linear-gradient(135deg,#0f2027,#203a43,#2c5364);
+            padding:20px;
+        }
+
+        .container{
+            width:500px;
+            background:rgba(0,0,0,0.75);
+            padding:30px;
+            border-radius:12px;
+            color:white;
+            box-shadow:0 10px 25px rgba(0,0,0,0.4);
+        }
+
+        h2{
+            text-align:center;
+            margin-bottom:20px;
+            color:#00c6ff;
+        }
+
+        .section-title{
+            margin-top:15px;
+            margin-bottom:10px;
+            font-weight:bold;
+            color:#00c6ff;
+        }
+
+        .info p{
+            line-height:1.8;
+            font-size:15px;
+        }
+
+        .info span{
+            color:#00c6ff;
+            font-weight:bold;
+        }
+
+        input, textarea{
+            width:100%;
+            padding:12px;
+            margin:10px 0;
+            border:none;
+            border-radius:8px;
+            outline:none;
+        }
+
+        textarea{
+            resize:none;
+            height:100px;
+        }
+
+        button{
+            width:100%;
+            padding:12px;
+            border:none;
+            border-radius:8px;
+            background:#00c6ff;
+            color:white;
+            font-size:16px;
+            cursor:pointer;
+            transition:0.3s;
+        }
+
+        button:hover{
+            background:#0072ff;
+        }
+
+        .back-btn{
+            margin-top:10px;
+            background:#00c853;
+        }
+
+        .back-btn:hover{
+            background:#009624;
+        }
+
+        .error{
+            color:#ff4d4d;
+            font-size:13px;
+            margin-top:-5px;
+        }
+
+    </style>
+
+</head>
+
+<body>
+
+<div class="container">
+
+    <h2>Contact & Feedback</h2>
+
+    <div class="section-title">Our Contact Details</div>
+
+    <div class="info">
+
+        <p><span>Project:</span> Oral Disease Detection System</p>
+        <p><span>Developers:</span> DARSHAN T K, DARSHAN G L, DIPSY GANAPATHY AND NANJAPPA</p>
+        <p><span>Email:</span> dipsyganapathi@gmail.com</p>
+        <p><span>Phone:</span> +91-6362332190</p>
+        <p><span>Location:</span> Karnataka, India</p>
+
+    </div>
+
+    <div class="section-title">Feedback</div>
+
+    <form id="feedbackForm">
+
+        <input type="text" id="name" name="name" placeholder="Your Name" required>
+        <div id="nameError" class="error"></div>
+
+        <input type="email" id="email" name="email" placeholder="Your Email (example@gmail.com)" required>
+        <div id="emailError" class="error"></div>
+
+        <textarea name="feedback" placeholder="Write your feedback..." required></textarea>
+
+        <button type="submit">Submit Feedback</button>
+
+    </form>
+
+    <button class="back-btn" onclick="window.location.href='index.php'">
+        Back to Home
+    </button>
+
+</div>
+
+<script>
+document.getElementById("feedbackForm").addEventListener("submit", function(e) {
+    e.preventDefault();
+
+    let name = document.querySelector("input[name='name']").value.trim();
+    let email = document.querySelector("input[name='email']").value.trim();
+
+    // Name error check
+    let namePattern = /^[A-Za-z]+$/;
+
+    if (!namePattern.test(name)) {
+        alert("❌ Name must contain only characters (A-Z, a-z)");
+        return;
+    }
+
+    // Email error check (must be full format like gmail.com)
+    let emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    if (!emailPattern.test(email)) {
+        alert("❌ Enter full valid email like example@gmail.com");
+        return;
+    }
+
+    let formData = new FormData(this);
+
+    fetch("../backend/feedback.php", {
+        method: "POST",
+        body: formData
+    })
+    .then(response => response.text())
+    .then(data => {
+        alert("✅ Feedback submitted successfully!");
+        document.getElementById("feedbackForm").reset();
+    })
+    .catch(error => {
+        alert("❌ Error submitting feedback");
+    });
+
+});
+</script>
+
+</body>
+</html>
