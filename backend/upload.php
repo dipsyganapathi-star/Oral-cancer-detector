@@ -5,9 +5,10 @@ ini_set('display_errors', 1);
 
 header('Content-Type: application/json');
 
-require_once("../backend/db.php");
+// Connect to database
+require_once(__DIR__ . "/db.php");
 
-// ✅ FORCE CHECK DB CONNECTION
+// Check database connection
 if (!$conn) {
     die(json_encode([
         "status" => "error",
@@ -22,45 +23,79 @@ if (isset($_FILES['image'])) {
     $fileType = $_FILES['image']['type'];
     $fileSize = $_FILES['image']['size'];
 
+    // Allowed image types
     $allowedTypes = ['image/jpeg', 'image/png', 'image/jpg'];
 
     if (!in_array($fileType, $allowedTypes)) {
-        echo json_encode(["status" => "error", "message" => "Only JPG/PNG allowed"]);
+        echo json_encode([
+            "status" => "error",
+            "message" => "Only JPG/PNG allowed"
+        ]);
         exit();
     }
 
+    // File size validation (5 MB)
     if ($fileSize > 5 * 1024 * 1024) {
-        echo json_encode(["status" => "error", "message" => "File too large"]);
+        echo json_encode([
+            "status" => "error",
+            "message" => "File too large"
+        ]);
         exit();
     }
 
+    // Validate image
     if (getimagesize($tempname) === false) {
-        echo json_encode(["status" => "error", "message" => "Invalid image"]);
+        echo json_encode([
+            "status" => "error",
+            "message" => "Invalid image"
+        ]);
         exit();
     }
 
-    $newName = time() . "_" . preg_replace("/[^a-zA-Z0-9._-]/", "_", $filename);
-    $target_file = "../uploads/" . $newName;
+    // Generate unique filename
+    $newName = time() . "_" . preg_replace(
+        "/[^a-zA-Z0-9._-]/",
+        "_",
+        $filename
+    );
 
+    $target_file = __DIR__ . "/../uploads/" . $newName;
+
+    // Upload image
     if (!move_uploaded_file($tempname, $target_file)) {
-        echo json_encode(["status" => "error", "message" => "Upload failed"]);
+        echo json_encode([
+            "status" => "error",
+            "message" => "Upload failed"
+        ]);
         exit();
     }
 
+    // Locate Python prediction script
     $script = realpath(__DIR__ . "/../ai_model/predict.py");
 
     if (!$script) {
         unlink($target_file);
-        echo json_encode(["status" => "error", "message" => "Python script not found"]);
+
+        echo json_encode([
+            "status" => "error",
+            "message" => "Python script not found"
+        ]);
         exit();
     }
 
-    $command = "python \"$script\" \"$target_file\" 2>&1";
+    // Execute Python AI model
+    $command = "python " . escapeshellarg($script) . " " .
+               escapeshellarg($target_file) . " 2>&1";
+
     $output = shell_exec($command);
 
     if (!$output) {
         unlink($target_file);
-        echo json_encode(["status" => "error", "message" => "AI model failed"]);
+
+        echo json_encode([
+            "status" => "error",
+            "message" => "AI model failed"
+        ]);
         exit();
     }
 
@@ -70,24 +105,29 @@ if (isset($_FILES['image'])) {
     $disease = trim($lines[0] ?? "UNKNOWN");
     $confidence = trim($lines[1] ?? "0");
 
-    // ❌ NON ORAL CHECK
+    // Reject non-oral images
     if (strtoupper($disease) == "NON_ORAL") {
         unlink($target_file);
-        echo json_encode(["status" => "error", "message" => "Non-oral image detected"]);
+
+        echo json_encode([
+            "status" => "error",
+            "message" => "Non-oral image detected"
+        ]);
         exit();
     }
 
-    // ❌ UNKNOWN CHECK
+    // Reject unknown results
     if (strtoupper($disease) == "UNKNOWN") {
         unlink($target_file);
-        echo json_encode(["status" => "error", "message" => "Unknown result"]);
+
+        echo json_encode([
+            "status" => "error",
+            "message" => "Unknown result"
+        ]);
         exit();
     }
 
-    // -------------------------------
-    // 🔥 FINAL DATABASE INSERT (SAFE)
-    // -------------------------------
-
+    // Insert prediction into database
     $sql = "INSERT INTO predictions (image, result, percentage, created_at)
             VALUES (?, ?, ?, NOW())";
 
@@ -101,7 +141,8 @@ if (isset($_FILES['image'])) {
         exit();
     }
 
-    $stmt->bind_param("ssd", $newName, $disease, $confidence);
+    // All three values are strings
+    $stmt->bind_param("sss", $newName, $disease, $confidence);
 
     if (!$stmt->execute()) {
         echo json_encode([
@@ -111,12 +152,15 @@ if (isset($_FILES['image'])) {
         exit();
     }
 
+    // Successful response
     echo json_encode([
         "status" => "success",
         "disease" => $disease,
         "confidence" => $confidence,
         "image" => $newName
     ]);
+
+    $stmt->close();
 
 } else {
 
@@ -125,4 +169,5 @@ if (isset($_FILES['image'])) {
         "message" => "No image selected"
     ]);
 }
+
 ?>
