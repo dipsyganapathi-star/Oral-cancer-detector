@@ -40,3 +40,7 @@ The Oral Cancer Detection System is a web-based academic project developed to as
 
 ## Disclaimer
 This project is intended for academic and educational purposes. It is not a clinically validated diagnostic system and should not replace professional medical advice or diagnosis.
+
+## Project Screenshots
+### Home Page
+![Home Page](Screenshots/HOME.png)
